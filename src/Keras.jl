@@ -20,7 +20,7 @@ help from a PyObject via zero or more keys.
 This saves us time when loading Keras, since we don't have
 to load up all of the documentation strings right away.
 """
-immutable PyDoc
+struct PyDoc
     obj::PyObject
     names::Tuple{Vararg{Symbol}}
 

@@ -1,15 +1,36 @@
 using Keras
 using StatsBase
 
-using Base.Test
+using Test
 
 import Keras.Layers: Dense, Activation, LSTM
+import Random: bitrand
+import Statistics: mean, std, var
+
+using PyCall
 
 mse(actual, pred) = mean(square(actual - pred))
 mae(actual, pred) = mean(abs(actual - pred))
 rmse(actual, pred) = sqrt(mse(actual, pred))
 
+# TODO: For some reason @pydef is always exported as PyNULL() from the Keras module
+"""
+    metric(f::Function; name=nothing) -> Function
+
+Converts a julia function `f` to a python metric function to be used by Keras.
+Assumes that `f` is of the form `f(::Tensor, ::Tensor) -> Tensor`
+"""
+@pydef mutable struct metric
+    __init__(self, f::Function, name=nothing) = (
+        self[:f] = f;
+        self[:__name__] = name == nothing ? typeof(f).name.mt.name : name
+    )
+   __call__(self, x::PyObject, y::PyObject) = self[:f](Tensor(x), Tensor(y)).o
+end
+
 @testset "Keras" begin
+    verbosity = 1
+
     @testset "Basic Usage" begin
         model = Sequential()
         add!(model, Dense(80, input_dim=30))
@@ -23,12 +44,12 @@ rmse(actual, pred) = sqrt(mse(actual, pred))
             metrics=[:accuracy]
         )
 
-        h = fit!(model, rand(100, 30), rand(100, 10); epochs=20, batch_size=10, verbose=0)
+        h = fit!(model, rand(100, 30), rand(100, 10); epochs=20, batch_size=10, verbose=verbosity)
 
         @test haskey(h[:history], "acc")
         @test haskey(h[:history], "loss")
 
-        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=0)
+        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=verbosity)
         predict(model, rand(10, 30); batch_size=5, verbose=0)
     end
 
@@ -46,15 +67,15 @@ rmse(actual, pred) = sqrt(mse(actual, pred))
             metrics=[:accuracy, metric(mae), metric(rmse)]
         )
 
-        h = fit!(model, rand(100, 30), rand(100, 10); epochs=10, batch_size=10, verbose=0)
+        h = fit!(model, rand(100, 30), rand(100, 10); epochs=10, batch_size=10, verbose=verbosity)
 
         @test haskey(h[:history], "acc")
         @test haskey(h[:history], "loss")
         @test haskey(h[:history], "mae")
         @test haskey(h[:history], "rmse")
 
-        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=0)
-        predict(model, rand(10, 30); batch_size=5, verbose=0)
+        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=verbosity)
+        predict(model, rand(10, 30); batch_size=5, verbose=verbosity)
     end
 
     @testset "Tensor Operations" begin
@@ -69,6 +90,9 @@ rmse(actual, pred) = sqrt(mse(actual, pred))
                     @test op_result == bc_result
 
                     broadcast(op, x), bc_result
+                elseif op == transpose
+                    # eagerly evaluate possibly lazy LinearAlgebra.Transpose
+                    copy(op(x)), Keras.eval(op(x_t))
                 else
                     op(x), Keras.eval(op(x_t))
                 end
