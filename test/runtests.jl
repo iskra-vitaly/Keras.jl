@@ -1,35 +1,20 @@
+using Compat.Random
+using Compat.Statistics
+using Compat.Test
+using PyCall
 using Keras
 using StatsBase
 
-using Test
-
+import Keras: metric
 import Keras.Layers: Dense, Activation, LSTM
 import Random: bitrand
 import Statistics: mean, std, var
 
-using PyCall
-
-mse(actual, pred) = mean(square(actual - pred))
-mae(actual, pred) = mean(abs(actual - pred))
+mse(actual, pred) = Statistics.mean(square(actual - pred))
+mae(actual, pred) = Statistics.mean(abs(actual - pred))
 rmse(actual, pred) = sqrt(mse(actual, pred))
 
-# TODO: For some reason @pydef is always exported as PyNULL() from the Keras module
-"""
-    metric(f::Function; name=nothing) -> Function
-
-Converts a julia function `f` to a python metric function to be used by Keras.
-Assumes that `f` is of the form `f(::Tensor, ::Tensor) -> Tensor`
-"""
-@pydef mutable struct metric
-    __init__(self, f::Function, name=nothing) = (
-        self[:f] = f;
-        self[:__name__] = name == nothing ? typeof(f).name.mt.name : name
-    )
-   __call__(self, x::PyObject, y::PyObject) = self[:f](Tensor(x), Tensor(y)).o
-end
-
 @testset "Keras" begin
-    verbosity = 1
 
     @testset "Basic Usage" begin
         model = Sequential()
@@ -44,38 +29,40 @@ end
             metrics=[:accuracy]
         )
 
-        h = fit!(model, rand(100, 30), rand(100, 10); epochs=20, batch_size=10, verbose=verbosity)
+        h = fit!(model, rand(100, 30), rand(100, 10); epochs=20, batch_size=10, verbose=0)
 
         @test haskey(h[:history], "acc")
         @test haskey(h[:history], "loss")
 
-        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=verbosity)
+        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=0)
         predict(model, rand(10, 30); batch_size=5, verbose=0)
     end
 
-    @testset "Custom Objectives & Metrics" begin
-        model = Sequential()
-        add!(model, Dense(20, input_dim=30))
-        add!(model, Activation(:relu))
-        add!(model, Dense(10))
-        add!(model, Activation(:softmax))
+    if VERSION >= v"0.7.0"
+        @testset "Custom Objectives & Metrics" begin
+            model = Sequential()
+            add!(model, Dense(20, input_dim=30))
+            add!(model, Activation(:relu))
+            add!(model, Dense(10))
+            add!(model, Activation(:softmax))
 
-        compile!(
-            model;
-            loss=metric(mse),
-            optimizer=:sgd,
-            metrics=[:accuracy, metric(mae), metric(rmse)]
-        )
+            compile!(
+                model;
+                loss=metric(mse),
+                optimizer=:sgd,
+                metrics=[:accuracy, metric(mae), metric(rmse)]
+            )
 
-        h = fit!(model, rand(100, 30), rand(100, 10); epochs=10, batch_size=10, verbose=verbosity)
+            h = fit!(model, rand(100, 30), rand(100, 10); epochs=10, batch_size=10, verbose=0)
 
-        @test haskey(h[:history], "acc")
-        @test haskey(h[:history], "loss")
-        @test haskey(h[:history], "mae")
-        @test haskey(h[:history], "rmse")
+            @test haskey(h[:history], "acc")
+            @test haskey(h[:history], "loss")
+            @test haskey(h[:history], "mae")
+            @test haskey(h[:history], "rmse")
 
-        evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=verbosity)
-        predict(model, rand(10, 30); batch_size=5, verbose=verbosity)
+            evaluate(model, rand(10, 30), rand(10, 10); batch_size=5, verbose=0)
+            predict(model, rand(10, 30); batch_size=5, verbose=0)
+        end
     end
 
     @testset "Tensor Operations" begin
@@ -98,7 +85,7 @@ end
                 end
 
                 @test size(expected) == size(result)
-                @test typeof(expected) == typeof(result)
+                @test op === transpose || typeof(expected) == typeof(result)
                 match = all(map(isapprox, expected, result))
                 if !match
                     println(expected)
@@ -107,7 +94,7 @@ end
                 @test match
             end
 
-            @testset "Testing $op" for op in [maximum, minimum, sum, prod, var, std, mean]
+            @testset "Testing $op" for op in [maximum, minimum, sum, prod, Statistics.var, Statistics.std, Statistics.mean]
                 expected = Float32(op(x))
                 result = Float32(Keras.eval(op(x_t))[1])
 

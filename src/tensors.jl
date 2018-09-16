@@ -9,8 +9,7 @@
 # mapping of function names and we aren't performing inspection on the python KB code.
 #
 # TODO: Check that PyObject is an appropriate Tensor.
-
-import Statistics
+using Compat.Statistics
 
 struct Tensor
     o::PyObject

@@ -1,25 +1,25 @@
 using StatsBase
 
-@compat abstract type Model end
+abstract type Model end
 
-layers(m::T) where {T<:Model} = @error "layers(::$T) not implemented."
+layers(m::T) where {T<:Model} = error("layers(::$T) not implemented.")
 
-inputs(m::T) where {T<:Model} = @error "inputs(::$T) not implemented."
+inputs(m::T) where {T<:Model} = error("inputs(::$T) not implemented.")
 
-outputs(m::T) where {T<:Model} = @error "outputs(::$T) not implemented."
+outputs(m::T) where {T<:Model} = error("outputs(::$T) not implemented.")
 
-Base.getindex(m::T, i::Int) where {T<:Model} = @error "getindex(::$T, ::Int) not implemented"
+Base.getindex(m::T, i::Int) where {T<:Model} = error("getindex(::$T, ::Int) not implemented")
 
 function StatsBase.fit!(m::T, args...; kwargs...) where {T<:Model}
-    @error "fit(::$T, args...; kwargs...) not implemented."
+    error("fit(::$T, args...; kwargs...) not implemented.")
 end
 
 function evaluate(m::T, args...; kwargs...) where {T<:Model}
-    @error "evaluate(::$T, args...; kwargs...) not implemented."
+    error("evaluate(::$T, args...; kwargs...) not implemented.")
 end
 
 function StatsBase.predict(m::T, args...; kwargs...) where {T<:Model}
-    @error "predict(::$T, args...; kwargs...) not implemented."
+    error("predict(::$T, args...; kwargs...) not implemented.")
 end
 
 #= TODO:
